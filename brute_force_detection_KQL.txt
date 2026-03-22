@@ -1,0 +1,7 @@
+SecurityEvent
+| where EventID == 4771
+| where Status == "0x18"
+| summarize FailedAttempts = count() by IpAddress, TargetAccount, bin(TimeGenerated, 5m)
+| where FailedAttempts >= 2
+| project TimeGenerated, IpAddress, TargetAccount, FailedAttempts
+| sort by FailedAttempts desc

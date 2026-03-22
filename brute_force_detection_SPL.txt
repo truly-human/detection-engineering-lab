@@ -1,0 +1,5 @@
+index=windows EventCode=4771
+| stats count by Client_Address, Account_Name
+| where count >= 2
+| table Client_Address, Account_Name, count
+| sort - count
