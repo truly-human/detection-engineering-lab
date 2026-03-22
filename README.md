@@ -66,3 +66,63 @@ false positives.
 - Technique: T1110.003 — Password Spraying
 
 ---
+---
+
+## Detection 2 — Pass the Hash (T1550.002)
+
+### What is this attack?
+An attacker steals a password hash from memory and uses it to authenticate
+to other machines without knowing the actual plaintext password.
+Commonly performed using Mimikatz sekurlsa::pth command.
+
+### Log Source
+- Windows Security Event Log
+- Sample file: `LM_4624_mimikatz_sekurlsa_pth_source_machine.evtx`
+
+### Key Event IDs
+| Event ID | Meaning |
+|----------|---------|
+| 4624 | Successful logon (with suspicious Type 9 indicator) |
+| 4672 | Special privileges assigned — attacker gained admin access |
+| 4688 | New process created — commands executed post-compromise |
+
+### What I Found in the Logs
+- Logon Type 9 (NewCredentials) — specific to Mimikatz PTH command
+- Authentication Package: Negotiate combined with Type 9 is a known Mimikatz signature
+- Logon GUID all zeros — indicates forged credentials, not a real Kerberos ticket
+- Source Address `::1` (localhost) — attack executed locally after initial access
+- Account `user01` in domain `EXAMPLE` was used to move laterally
+
+### Splunk Detection Rule (SPL)
+```spl
+index=windows EventCode=4624 Logon_Type=9
+| stats count by Account_Name, Workstation_Name, Source_Network_Address
+| where count >= 1
+| table Account_Name, Workstation_Name, Source_Network_Address, count
+```
+
+### Sentinel Detection Rule (KQL)
+```kql
+SecurityEvent
+| where EventID == 4624
+| where LogonType == 9
+| where AuthenticationPackageName == "Negotiate"
+| where LogonGuid == "00000000-0000-0000-0000-000000000000"
+| project TimeGenerated, AccountName, WorkstationName, IpAddress, LogonType
+| sort by TimeGenerated desc
+```
+
+### Rule Validation
+Logically validated against sample EVTX data. The 4624 event shows
+Logon Type 9 with Negotiate package and zeroed GUID — three stacked
+indicators that together form a high-fidelity PTH signature with very
+low false positive rate.
+
+### False Positives
+- Runas /netonly command used by legitimate admins generates Type 9 logons
+- Some legitimate applications use NewCredentials logon type
+- Recommend whitelisting known admin workstations
+
+### MITRE ATT&CK Mapping
+- Tactic: Lateral Movement
+- Technique: T1550.002 — Pass the Hash
