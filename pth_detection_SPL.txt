@@ -1,0 +1,4 @@
+index=windows EventCode=4624 Logon_Type=9
+| stats count by Account_Name, Workstation_Name, Source_Network_Address
+| where count >= 1
+| table Account_Name, Workstation_Name, Source_Network_Address, count

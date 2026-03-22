@@ -1,0 +1,7 @@
+SecurityEvent
+| where EventID == 4624
+| where LogonType == 9
+| where AuthenticationPackageName == "Negotiate"
+| where LogonGuid == "00000000-0000-0000-0000-000000000000"
+| project TimeGenerated, AccountName, WorkstationName, IpAddress, LogonType
+| sort by TimeGenerated desc
