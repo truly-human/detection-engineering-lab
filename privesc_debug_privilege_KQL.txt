@@ -1,0 +1,6 @@
+SecurityEvent
+| where EventID == 4703
+| where EnabledPrivilegeList contains "SeDebugPrivilege"
+| where ProcessName !contains "lsass.exe"
+| project TimeGenerated, AccountName, ProcessName, Computer
+| sort by TimeGenerated desc

@@ -1,0 +1,4 @@
+index=windows EventCode=4703 Enabled_Privileges="SeDebugPrivilege"
+| where Process_Name!="C:\\Windows\\System32\\lsass.exe"
+| table Account_Name, Process_Name, Host, _time
+| sort - _time
