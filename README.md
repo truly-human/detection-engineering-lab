@@ -126,3 +126,67 @@ low false positive rate.
 ### MITRE ATT&CK Mapping
 - Tactic: Lateral Movement
 - Technique: T1550.002 — Pass the Hash
+
+---
+
+## Detection 3 — SeDebugPrivilege Abuse via Mimikatz (T1134)
+
+### What is this attack?
+An attacker enables SeDebugPrivilege on their process, which grants
+the ability to read and write memory of other processes. This is a
+required step before credential dumping tools like Mimikatz can steal
+password hashes from memory. This detection catches that enablement.
+
+### Log Source
+- Windows Security Event Log
+- Sample file: `win10_4703_SeDebugPrivilege_enabled.evtx`
+
+### Key Event IDs
+| Event ID | Meaning |
+|----------|---------|
+| 4703 | A token right (privilege) was adjusted on a process |
+
+### What I Found in the Logs
+- Process `mimikatz.exe` running directly from Desktop — no attempt to hide
+- SeDebugPrivilege explicitly enabled by the process
+- Subject and Target are the same account (`IEUser`) — self-granted privilege
+- Machine: `MSEDGEWIN10` — standard workstation, not a server
+
+### Splunk Detection Rule (SPL)
+```spl
+index=windows EventCode=4703 Enabled_Privileges="SeDebugPrivilege"
+| where Process_Name!="C:\\Windows\\System32\\lsass.exe"
+| table Account_Name, Process_Name, Host, _time
+| sort - _time
+```
+
+### Sentinel Detection Rule (KQL)
+```kql
+SecurityEvent
+| where EventID == 4703
+| where EnabledPrivilegeList contains "SeDebugPrivilege"
+| where ProcessName !contains "lsass.exe"
+| project TimeGenerated, AccountName, ProcessName, Computer
+| sort by TimeGenerated desc
+```
+
+### Rule Validation
+Logically validated against sample EVTX data. Single 4703 event shows
+mimikatz.exe explicitly enabling SeDebugPrivilege. The lsass.exe
+exclusion removes the only common legitimate use of this privilege,
+making this a high-fidelity detection with very low false positive rate.
+
+### False Positives
+- lsass.exe legitimately uses SeDebugPrivilege — excluded in rule
+- Some legitimate debugging tools may enable this privilege
+- Recommend whitelisting known developer machines in production
+
+### How This Links to Detection 2
+SeDebugPrivilege enablement (this detection) is the step that makes
+Pass the Hash (Detection 2) possible. Together they represent two
+stages of the same attack chain — privilege enablement followed by
+credential theft.
+
+### MITRE ATT&CK Mapping
+- Tactic: Privilege Escalation
+- Technique: T1134 — Access Token Manipulation
